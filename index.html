@@ -1,0 +1,1318 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>譜読み練習</title>
+    <script src="https://cdn.jsdelivr.net/npm/opensheetmusicdisplay@1.9.6/build/opensheetmusicdisplay.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 0;
+            padding: 24px;
+            background: #f5f5f5;
+            text-align: center;
+        }
+
+        h1 {
+            margin-top: 0;
+            font-size: 28px;
+        }
+
+        .panel {
+            background: #fff;
+            border-radius: 12px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+            max-width: 1150px;
+            margin: 0 auto 18px;
+            padding: 16px;
+        }
+
+        .panel-title {
+            text-align: left;
+            font-size: 12px;
+            color: #555;
+            margin-bottom: 12px;
+            font-weight: bold;
+        }
+
+        .panel-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .panel-header .panel-title {
+            margin-bottom: 0;
+        }
+
+        .scale-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .scale-button {
+            border: 1px solid #c7c7c7;
+            background: #fff;
+            color: #444;
+            border-radius: 999px;
+            padding: 4px 10px;
+            font-size: 12px;
+            cursor: pointer;
+        }
+
+        .scale-button.is-active {
+            background: #222;
+            color: #fff;
+            border-color: #222;
+        }
+
+        .main-layout {
+            display: grid;
+            grid-template-columns: max-content max-content max-content;
+            column-gap: 16px;
+            row-gap: 12px;
+            align-items: start;
+            justify-content: start;
+        }
+
+        .preview-pane {
+            text-align: left;
+            width: fit-content;
+        }
+
+        .primary-menu-pane,
+        .option-pane {
+            text-align: left;
+            display: grid;
+            gap: 10px;
+            align-content: start;
+        }
+
+        .subsection-title {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 2px;
+            font-weight: bold;
+        }
+
+        .control-block {
+            text-align: left;
+        }
+
+        .inline-control-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) 100px;
+            gap: 16px;
+            align-items: start;
+        }
+
+        .inline-control-row .control-block {
+            min-width: 0;
+        }
+
+        .inline-control-row .check-label {
+            min-height: 38px;
+            align-items: center;
+        }
+
+        .inline-control-row select {
+            min-width: 0;
+        }
+
+        .control-block label {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            font-size: 12px;
+            color: #333;
+        }
+
+        .check-label {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center;
+            gap: 8px !important;
+            white-space: nowrap;
+        }
+
+        select {
+            font-size: 16px;
+            padding: 6px 8px;
+            box-sizing: border-box;
+            width: 100%;
+        }
+
+        #rangePreviewLabel {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 8px;
+            white-space: pre-wrap;
+        }
+
+        #rangePreviewScore {
+            min-height: 150px;
+            width: 220px;
+        }
+
+        /* #score {
+            max-width: 1000px;
+            min-height: 240px;
+            margin: 0 auto;
+            background: #fff;
+            border-radius: 12px;
+            padding: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+        } */
+
+        #score {
+            max-width: 1000px;
+            min-height: 240px;
+            margin: 0 auto;
+            text-align: center;
+        }
+
+        #score svg {
+            display: block;
+            margin: 0 auto;
+            shape-rendering: geometricPrecision;
+            text-rendering: geometricPrecision;
+        }
+
+        #rangePreviewScore svg {
+            shape-rendering: geometricPrecision;
+            text-rendering: geometricPrecision;
+        }
+
+        .status-stack {
+            display: grid;
+            gap: 6px;
+            margin-top: 16px;
+        }
+
+        #status,
+        #midiStatus {
+            font-size: 18px;
+        }
+
+        #midiStatus {
+            color: #555;
+            font-size: 15px;
+        }
+
+        #debug {
+            margin-top: 8px;
+            font-size: 14px;
+            color: #666;
+            white-space: pre-wrap;
+        }
+
+        @media (max-width: 600px) {
+            .main-layout {
+                grid-template-columns: max-content max-content;
+            }
+
+            .option-pane {
+                grid-column: 1 / -1;
+            }
+
+            .inline-control-row {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            .main-layout {
+                grid-template-columns: 1fr;
+            }
+
+            .preview-pane,
+            .primary-menu-pane,
+            .option-pane {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+
+<body>
+    <h1>譜読み練習</h1>
+    <p>出題する音の範囲と表記を設定すると<br>下の問題譜面にランダムに音符が表示されます。<br>
+        その音をMIDIキーボードで弾き、正解なら次の音符が表示されます。</p>
+    <div class="panel">
+        <div class="panel-title">設定</div>
+        <div class="main-layout">
+            <div class="preview-pane">
+                <div id="rangePreviewLabel"></div>
+                <div id="rangePreviewScore"></div>
+            </div>
+
+            <div class="primary-menu-pane">
+                <div class="subsection-title">主要設定</div>
+
+                <div class="control-block">
+                    <label>
+                        最高音
+                        <select id="maxNote"></select>
+                    </label>
+                </div>
+
+                <div class="control-block">
+                    <label>
+                        最低音
+                        <select id="minNote"></select>
+                    </label>
+                </div>
+
+                <div class="control-block">
+                    <label>
+                        調号
+                        <select id="keySignature"></select>
+                    </label>
+                </div>
+            </div>
+
+            <div class="option-pane">
+                <div class="subsection-title">出題オプション</div>
+
+                <div class="control-block">
+                    <label>
+                        譜表
+                        <select id="staffMode">
+                            <option value="treble">ト音のみ</option>
+                            <option value="bass">ヘ音のみ</option>
+                            <option value="grand" selected>大譜表</option>
+                        </select>
+                    </label>
+                </div>
+
+                <div class="control-block">
+                    <label class="check-label">
+                        <input type="checkbox" id="allowChromatic">
+                        スケール外の音を含む
+                    </label>
+                </div>
+
+                <div class="control-block">
+                    <label class="check-label">
+                        <input type="checkbox" id="avoidNearby">
+                        近い音の連続を減らす
+                    </label>
+                </div>
+
+                <div class="inline-control-row">
+                    <div class="control-block">
+                        <label class="check-label">
+                            <input type="checkbox" id="allowGrandStaffLedger">
+                            大譜表で加線を使用
+                        </label>
+                    </div>
+
+                    <div class="control-block">
+                        <label>
+                            加線数の上限
+                            <select id="grandStaffLedgerLimit">
+                                <option value="0">0本</option>
+                                <option value="1">1本</option>
+                                <option value="2" selected>2本</option>
+                                <option value="3">3本</option>
+                                <option value="4">4本</option>
+                            </select>
+                        </label>
+                    </div>
+                </div>
+
+                <div class="control-block">
+                    <label>
+                        臨時記号表記
+                        <select id="accidentalMode">
+                            <option value="auto" selected>自動</option>
+                            <option value="sharp">♯優先</option>
+                            <option value="flat">♭優先</option>
+                        </select>
+                    </label>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="panel">
+        <div class="panel-header">
+            <div class="panel-title">問題</div>
+            <div class="scale-controls" aria-label="問題譜面の倍率">
+                <button type="button" class="scale-button is-active" data-scale="1">x1</button>
+                <button type="button" class="scale-button" data-scale="2">x2</button>
+                <button type="button" class="scale-button" data-scale="3">x3</button>
+            </div>
+        </div>
+        <div id="score"></div>
+    </div>
+
+    <div class="status-stack">
+        <div id="status">初期化中...</div>
+        <div id="midiStatus">MIDI初期化中...</div>
+    </div>
+    <div id="debug"></div>
+
+    <script>
+        const MIN_MIDI = 21;
+        const MAX_MIDI = 108;
+
+        const NATURAL_PITCH_CLASS_BY_STEP = {
+            C: 0,
+            D: 2,
+            E: 4,
+            F: 5,
+            G: 7,
+            A: 9,
+            B: 11
+        };
+        const NATURAL_PITCH_CLASSES = Object.values(NATURAL_PITCH_CLASS_BY_STEP);
+        const NOTE_NAMES_SHARP = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+        const STEP_SEQUENCE = ["C", "D", "E", "F", "G", "A", "B"];
+        const MAJOR_SCALE_INTERVALS = [0, 2, 4, 5, 7, 9, 11];
+
+        const MAJOR_KEYS = [
+            { label: "Cb major", fifths: -7 },
+            { label: "Gb major", fifths: -6 },
+            { label: "Db major", fifths: -5 },
+            { label: "Ab major", fifths: -4 },
+            { label: "Eb major", fifths: -3 },
+            { label: "Bb major", fifths: -2 },
+            { label: "F major", fifths: -1 },
+            { label: "C major", fifths: 0 },
+            { label: "G major", fifths: 1 },
+            { label: "D major", fifths: 2 },
+            { label: "A major", fifths: 3 },
+            { label: "E major", fifths: 4 },
+            { label: "B major", fifths: 5 },
+            { label: "F# major", fifths: 6 },
+            { label: "C# major", fifths: 7 }
+        ];
+
+        const SHARP_SPELLING = {
+            0: { step: "C", alter: 0 },
+            1: { step: "C", alter: 1 },
+            2: { step: "D", alter: 0 },
+            3: { step: "D", alter: 1 },
+            4: { step: "E", alter: 0 },
+            5: { step: "F", alter: 0 },
+            6: { step: "F", alter: 1 },
+            7: { step: "G", alter: 0 },
+            8: { step: "G", alter: 1 },
+            9: { step: "A", alter: 0 },
+            10: { step: "A", alter: 1 },
+            11: { step: "B", alter: 0 }
+        };
+
+        const FLAT_SPELLING = {
+            0: { step: "C", alter: 0 },
+            1: { step: "D", alter: -1 },
+            2: { step: "D", alter: 0 },
+            3: { step: "E", alter: -1 },
+            4: { step: "E", alter: 0 },
+            5: { step: "F", alter: 0 },
+            6: { step: "G", alter: -1 },
+            7: { step: "G", alter: 0 },
+            8: { step: "A", alter: -1 },
+            9: { step: "A", alter: 0 },
+            10: { step: "B", alter: -1 },
+            11: { step: "B", alter: 0 }
+        };
+
+        const SCALE_PITCH_CLASSES_BY_FIFTHS = {
+            "-7": [11, 1, 3, 4, 6, 8, 10],
+            "-6": [6, 8, 10, 11, 1, 3, 5],
+            "-5": [1, 3, 5, 6, 8, 10, 0],
+            "-4": [8, 10, 0, 1, 3, 5, 7],
+            "-3": [3, 5, 7, 8, 10, 0, 2],
+            "-2": [10, 0, 2, 3, 5, 7, 9],
+            "-1": [5, 7, 9, 10, 0, 2, 4],
+            "0": [0, 2, 4, 5, 7, 9, 11],
+            "1": [7, 9, 11, 0, 2, 4, 6],
+            "2": [2, 4, 6, 7, 9, 11, 1],
+            "3": [9, 11, 1, 2, 4, 6, 8],
+            "4": [4, 6, 8, 9, 11, 1, 3],
+            "5": [11, 1, 3, 4, 6, 8, 10],
+            "6": [6, 8, 10, 11, 1, 3, 5],
+            "7": [1, 3, 5, 6, 8, 10, 0]
+        };
+
+        const KEY_SPELLINGS_BY_FIFTHS = buildKeySpellings();
+        const SETTINGS_STORAGE_KEY = "note-reading-practice-settings-v1";
+
+        let osmd = null;
+        let midiAccess = null;
+        let currentNote = null;
+        let previousNote = null;
+        let renderToken = 0;
+        let previewRenderToken = 0;
+        let questionScale = 1;
+
+        function midiToName(midi) {
+            const octave = Math.floor(midi / 12) - 1;
+            const name = NOTE_NAMES_SHARP[midi % 12];
+            return `${name}${octave}`;
+        }
+
+        function isNaturalMidi(midi) {
+            return NATURAL_PITCH_CLASSES.includes(midi % 12);
+        }
+
+        function mod12(value) {
+            return ((value % 12) + 12) % 12;
+        }
+
+        function parseKeyTonic(label) {
+            const tonic = label.split(" ")[0];
+            const step = tonic[0];
+            const accidental = tonic.slice(1);
+            const alter = accidental === "#" ? 1 : accidental === "b" ? -1 : 0;
+            return { step, alter };
+        }
+
+        function buildKeySpellings() {
+            const spellings = {};
+
+            for (const key of MAJOR_KEYS) {
+                const tonic = parseKeyTonic(key.label);
+                const tonicIndex = STEP_SEQUENCE.indexOf(tonic.step);
+                const tonicPitchClass = mod12(NATURAL_PITCH_CLASS_BY_STEP[tonic.step] + tonic.alter);
+                const keySpellings = {};
+
+                for (let degree = 0; degree < STEP_SEQUENCE.length; degree++) {
+                    const step = STEP_SEQUENCE[(tonicIndex + degree) % STEP_SEQUENCE.length];
+                    const targetPitchClass = mod12(tonicPitchClass + MAJOR_SCALE_INTERVALS[degree]);
+                    const naturalPitchClass = NATURAL_PITCH_CLASS_BY_STEP[step];
+                    const alter = targetPitchClass - naturalPitchClass;
+                    const normalizedAlter = alter > 6 ? alter - 12 : alter < -6 ? alter + 12 : alter;
+
+                    keySpellings[targetPitchClass] = { step, alter: normalizedAlter };
+                }
+
+                spellings[String(key.fifths)] = keySpellings;
+            }
+
+            return spellings;
+        }
+
+        function createWholeStepNoteOptions() {
+            const notes = [];
+            for (let midi = MIN_MIDI; midi <= MAX_MIDI; midi++) {
+                if (isNaturalMidi(midi)) notes.push(midi);
+            }
+            return notes;
+        }
+
+        function fillSelectDescending(selectEl, notes, defaultMidi) {
+            selectEl.innerHTML = "";
+            const reversed = [...notes].sort((a, b) => b - a);
+
+            for (const midi of reversed) {
+                const opt = document.createElement("option");
+                opt.value = String(midi);
+                opt.textContent = midiToName(midi);
+                if (midi === defaultMidi) opt.selected = true;
+                selectEl.appendChild(opt);
+            }
+        }
+
+        function createNoteOptions() {
+            const notes = createWholeStepNoteOptions();
+            fillSelectDescending(document.getElementById("maxNote"), notes, 72);
+            fillSelectDescending(document.getElementById("minNote"), notes, 48);
+        }
+
+        function createKeyOptions() {
+            const sel = document.getElementById("keySignature");
+            sel.innerHTML = "";
+
+            for (const key of MAJOR_KEYS) {
+                const opt = document.createElement("option");
+                opt.value = String(key.fifths);
+                opt.textContent = key.label;
+                if (key.fifths === 0) opt.selected = true;
+                sel.appendChild(opt);
+            }
+        }
+
+        function getSettingsElements() {
+            return {
+                maxNote: document.getElementById("maxNote"),
+                minNote: document.getElementById("minNote"),
+                keySignature: document.getElementById("keySignature"),
+                staffMode: document.getElementById("staffMode"),
+                allowChromatic: document.getElementById("allowChromatic"),
+                avoidNearby: document.getElementById("avoidNearby"),
+                allowGrandStaffLedger: document.getElementById("allowGrandStaffLedger"),
+                grandStaffLedgerLimit: document.getElementById("grandStaffLedgerLimit"),
+                accidentalMode: document.getElementById("accidentalMode")
+            };
+        }
+
+        function collectSettings() {
+            const elements = getSettingsElements();
+            return {
+                maxNote: elements.maxNote.value,
+                minNote: elements.minNote.value,
+                keySignature: elements.keySignature.value,
+                staffMode: elements.staffMode.value,
+                allowChromatic: elements.allowChromatic.checked,
+                avoidNearby: elements.avoidNearby.checked,
+                allowGrandStaffLedger: elements.allowGrandStaffLedger.checked,
+                grandStaffLedgerLimit: elements.grandStaffLedgerLimit.value,
+                accidentalMode: elements.accidentalMode.value,
+                questionScale
+            };
+        }
+
+        function saveSettings() {
+            try {
+                localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(collectSettings()));
+            } catch (error) {
+                console.error("設定の保存に失敗しました", error);
+            }
+        }
+
+        function applySavedSettings() {
+            let raw = null;
+            try {
+                raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
+            } catch (error) {
+                console.error("保存設定の読込に失敗しました", error);
+                return;
+            }
+
+            if (!raw) return;
+
+            let saved;
+            try {
+                saved = JSON.parse(raw);
+            } catch (error) {
+                console.error("保存設定の解析に失敗しました", error);
+                return;
+            }
+
+            const elements = getSettingsElements();
+            for (const [key, element] of Object.entries(elements)) {
+                if (!(key in saved)) continue;
+
+                if (element.type === "checkbox") {
+                    element.checked = Boolean(saved[key]);
+                    continue;
+                }
+
+                const hasOption = Array.from(element.options || []).some((option) => option.value === String(saved[key]));
+                if (hasOption) {
+                    element.value = String(saved[key]);
+                }
+            }
+
+            if ([1, 2, 3].includes(Number(saved.questionScale))) {
+                questionScale = Number(saved.questionScale);
+            }
+        }
+
+        function isNoteInSelectedScale(midi, fifths) {
+            const pcs = SCALE_PITCH_CLASSES_BY_FIFTHS[String(fifths)];
+            if (!pcs) return true;
+            return pcs.includes(midi % 12);
+        }
+
+        function getCandidateNotes() {
+            const min = parseInt(document.getElementById("minNote").value, 10);
+            const max = parseInt(document.getElementById("maxNote").value, 10);
+            const allowChromatic = document.getElementById("allowChromatic").checked;
+            const fifths = parseInt(document.getElementById("keySignature").value, 10);
+
+            if (Number.isNaN(min) || Number.isNaN(max) || min > max) return [];
+
+            const notes = [];
+            for (let midi = min; midi <= max; midi++) {
+                if (!allowChromatic && !isNoteInSelectedScale(midi, fifths)) continue;
+                notes.push(midi);
+            }
+            return notes;
+        }
+
+        function pickRandom(arr) {
+            return arr[Math.floor(Math.random() * arr.length)];
+        }
+
+        function randomNoteNoRepeat() {
+            const candidates = getCandidateNotes();
+            if (candidates.length === 0) return null;
+            if (candidates.length === 1) return candidates[0];
+
+            const avoidNearby = document.getElementById("avoidNearby").checked;
+
+            let pool = candidates.filter(n => n !== previousNote);
+            if (pool.length === 0) pool = candidates;
+
+            if (avoidNearby && previousNote !== null) {
+                const farPool = pool.filter(n => Math.abs(n - previousNote) > 2);
+                if (farPool.length > 0) pool = farPool;
+            }
+
+            return pickRandom(pool);
+        }
+
+        function getAccidentalPreference() {
+            const mode = document.getElementById("accidentalMode").value;
+            if (mode === "sharp") return "sharp";
+            if (mode === "flat") return "flat";
+
+            const fifths = parseInt(document.getElementById("keySignature").value, 10);
+            return fifths < 0 ? "flat" : "sharp";
+        }
+
+        function midiToPitchInfo(midi) {
+            const pc = midi % 12;
+            const fifths = parseInt(document.getElementById("keySignature").value, 10);
+            const inKeySpelling = KEY_SPELLINGS_BY_FIFTHS[String(fifths)]?.[pc];
+            const prefer = getAccidentalPreference();
+            const base = inKeySpelling || (prefer === "flat" ? FLAT_SPELLING[pc] : SHARP_SPELLING[pc]);
+            const semitoneFromC0 = midi - 12;
+            const spelledSemitone = NATURAL_PITCH_CLASS_BY_STEP[base.step] + base.alter;
+            const octave = Math.floor((semitoneFromC0 - spelledSemitone) / 12);
+
+            return {
+                step: base.step,
+                alter: base.alter,
+                octave
+            };
+        }
+
+        function pitchToText(pitch) {
+            const accidental =
+                pitch.alter > 0 ? "#".repeat(pitch.alter) :
+                    pitch.alter < 0 ? "b".repeat(Math.abs(pitch.alter)) : "";
+            return `${pitch.step}${accidental}${pitch.octave}`;
+        }
+
+        function midiToDisplayName(midi) {
+            return pitchToText(midiToPitchInfo(midi));
+        }
+
+        function makePitchXml(pitch) {
+            const alterXml = pitch.alter !== 0 ? `<alter>${pitch.alter}</alter>` : "";
+            return `
+        <pitch>
+          <step>${pitch.step}</step>
+          ${alterXml}
+          <octave>${pitch.octave}</octave>
+        </pitch>
+      `;
+        }
+
+        function makeQuarterRestXml(staffNumber) {
+            return `
+        <note>
+          <rest/>
+          <duration>1</duration>
+          <type>quarter</type>
+          <staff>${staffNumber}</staff>
+        </note>
+      `;
+        }
+
+        function makeQuarterNoteXml(pitch, staffNumber, chord = false) {
+            return `
+        <note>
+          ${chord ? "<chord/>" : ""}
+          ${makePitchXml(pitch)}
+          <duration>1</duration>
+          <type>quarter</type>
+          <staff>${staffNumber}</staff>
+        </note>
+      `;
+        }
+
+        function addSvgViewBoxPadding(svg, padding) {
+            if (!svg) return;
+
+            const viewBox = svg.getAttribute("viewBox");
+            if (viewBox) {
+                const [minX, minY, width, height] = viewBox.split(/\s+/).map(Number);
+                if ([minX, minY, width, height].every(Number.isFinite)) {
+                    svg.setAttribute(
+                        "viewBox",
+                        `${minX - padding} ${minY - padding} ${width + padding * 2} ${height + padding * 2}`
+                    );
+                    return;
+                }
+            }
+
+            const width = Number(svg.getAttribute("width"));
+            const height = Number(svg.getAttribute("height"));
+            if (Number.isFinite(width) && Number.isFinite(height)) {
+                svg.setAttribute("viewBox", `${-padding} ${-padding} ${width + padding * 2} ${height + padding * 2}`);
+            }
+        }
+
+        function applyQuestionScale() {
+            const svg = document.querySelector("#score svg");
+            if (svg) {
+                if (!svg.dataset.baseWidth) {
+                    const viewBox = svg.getAttribute("viewBox");
+                    const viewBoxWidth = viewBox ? Number(viewBox.split(/\s+/)[2]) : NaN;
+                    const widthAttr = Number(svg.getAttribute("width"));
+                    const baseWidth = Number.isFinite(viewBoxWidth) && viewBoxWidth > 0
+                        ? viewBoxWidth
+                        : widthAttr;
+
+                    if (Number.isFinite(baseWidth) && baseWidth > 0) {
+                        svg.dataset.baseWidth = String(baseWidth);
+                    }
+                }
+
+                const baseWidth = Number(svg.dataset.baseWidth);
+                if (Number.isFinite(baseWidth) && baseWidth > 0) {
+                    svg.style.width = `${baseWidth * questionScale}px`;
+                } else {
+                    svg.style.width = `${questionScale * 100}%`;
+                }
+                svg.style.maxWidth = "none";
+                svg.style.height = "auto";
+            }
+
+            document.querySelectorAll(".scale-button").forEach((button) => {
+                button.classList.toggle("is-active", Number(button.dataset.scale) === questionScale);
+            });
+        }
+
+        function makeGrandStaffBoundingSpacers() {
+            return {
+                upper: `
+        <direction placement="above">
+          <direction-type>
+            <words default-y="80" font-size="1" color="#ffffff">.</words>
+          </direction-type>
+          <staff>1</staff>
+        </direction>
+      `,
+                lower: `
+        <direction placement="below">
+          <direction-type>
+            <words default-y="-80" font-size="1" color="#ffffff">.</words>
+          </direction-type>
+          <staff>2</staff>
+        </direction>
+      `
+            };
+        }
+
+        function makeSingleStaffBoundingSpacer(clefSign) {
+            if (clefSign !== "F") return "";
+
+            return `
+        <direction placement="below">
+          <direction-type>
+            <words default-y="-80" font-size="1" color="#ffffff">.</words>
+          </direction-type>
+        </direction>
+      `;
+        }
+
+        function chooseGrandStaffAssignment(midi) {
+            if (midi === 60) {
+                return Math.random() < 0.5;
+            }
+            return midi > 60;
+        }
+
+        function getGrandStaffLedgerLimit() {
+            return parseInt(document.getElementById("grandStaffLedgerLimit").value, 10);
+        }
+
+        function stepToDiatonicIndex(step, octave) {
+            return octave * 7 + STEP_SEQUENCE.indexOf(step);
+        }
+
+        function getLedgerLineCountForPitch(pitch, staff) {
+            const noteIndex = stepToDiatonicIndex(pitch.step, pitch.octave);
+            const staffBounds = staff === "treble"
+                ? {
+                    low: stepToDiatonicIndex("E", 4),
+                    high: stepToDiatonicIndex("F", 5)
+                }
+                : {
+                    low: stepToDiatonicIndex("G", 2),
+                    high: stepToDiatonicIndex("A", 3)
+                };
+
+            if (noteIndex < staffBounds.low) {
+                return Math.floor((staffBounds.low - noteIndex) / 2);
+            }
+            if (noteIndex > staffBounds.high) {
+                return Math.floor((noteIndex - staffBounds.high) / 2);
+            }
+            return 0;
+        }
+
+        function getGrandStaffCandidates(midi, pitch) {
+            const defaultStaff = chooseGrandStaffAssignment(midi) ? "treble" : "bass";
+            const candidates = [defaultStaff];
+            const ledgerEnabled = document.getElementById("allowGrandStaffLedger").checked;
+
+            if (!ledgerEnabled) return candidates;
+
+            const oppositeStaff = defaultStaff === "treble" ? "bass" : "treble";
+            const ledgerLimit = getGrandStaffLedgerLimit();
+            const oppositeLedgerCount = getLedgerLineCountForPitch(pitch, oppositeStaff);
+
+            if (oppositeLedgerCount <= ledgerLimit) {
+                candidates.push(oppositeStaff);
+            }
+
+            return candidates;
+        }
+
+        function createGrandStaffAssignments(midis) {
+            return midis.map((midi) => {
+                const pitch = midiToPitchInfo(midi);
+                const candidates = getGrandStaffCandidates(midi, pitch);
+                const chosenStaff = candidates[Math.floor(Math.random() * candidates.length)];
+                return chosenStaff === "treble";
+            });
+        }
+
+        function createSingleStaffXmlForSequence(pitches, clefSign, clefLine, fifths) {
+            const noteXml = pitches.map(p => makeQuarterNoteXml(p, 1)).join("");
+            const spacerXml = makeSingleStaffBoundingSpacer(clefSign);
+
+            return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE score-partwise PUBLIC
+  "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+  "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Music</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>${fifths}</fifths></key>
+        <time><beats>${pitches.length}</beats><beat-type>4</beat-type></time>
+        <clef><sign>${clefSign}</sign><line>${clefLine}</line></clef>
+      </attributes>
+      ${spacerXml}
+      ${noteXml}
+    </measure>
+  </part>
+</score-partwise>`;
+        }
+
+        function createSingleStaffXmlForChord(midis, clefSign, clefLine, fifths) {
+            const sorted = [...midis].sort((a, b) => a - b);
+            const pitches = sorted.map(midiToPitchInfo);
+            const noteXml = pitches.map((p, i) => makeQuarterNoteXml(p, 1, i > 0)).join("");
+            const spacerXml = makeSingleStaffBoundingSpacer(clefSign);
+
+            return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE score-partwise PUBLIC
+  "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+  "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Music</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>${fifths}</fifths></key>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+        <clef><sign>${clefSign}</sign><line>${clefLine}</line></clef>
+      </attributes>
+      ${spacerXml}
+      ${noteXml}
+    </measure>
+  </part>
+</score-partwise>`;
+        }
+
+        function createGrandStaffXmlForSequence(midis, fifths, staffAssignments = createGrandStaffAssignments(midis)) {
+            const upper = [];
+            const lower = [];
+            const spacers = makeGrandStaffBoundingSpacers();
+
+            for (const [index, midi] of midis.entries()) {
+                const pitch = midiToPitchInfo(midi);
+                if (staffAssignments[index]) {
+                    upper.push(makeQuarterNoteXml(pitch, 1) + spacers.upper);
+                    lower.push(makeQuarterRestXml(2) + spacers.lower);
+                } else {
+                    upper.push(makeQuarterRestXml(1));
+                    lower.push(makeQuarterNoteXml(pitch, 2) + spacers.lower);
+                }
+            }
+
+            const duration = midis.length;
+
+            return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE score-partwise PUBLIC
+  "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+  "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>${fifths}</fifths></key>
+        <time><beats>${duration}</beats><beat-type>4</beat-type></time>
+        <staves>2</staves>
+        <clef number="1"><sign>G</sign><line>2</line></clef>
+        <clef number="2"><sign>F</sign><line>4</line></clef>
+      </attributes>
+      ${upper.join("")}
+      <backup><duration>${duration}</duration></backup>
+      ${lower.join("")}
+    </measure>
+  </part>
+</score-partwise>`;
+        }
+
+        function createGrandStaffXmlForChord(midis, fifths, staffAssignments = createGrandStaffAssignments(midis)) {
+            const upperMidis = midis
+                .filter((_, index) => staffAssignments[index])
+                .sort((a, b) => a - b);
+            const lowerMidis = midis
+                .filter((_, index) => !staffAssignments[index])
+                .sort((a, b) => a - b);
+            const spacers = makeGrandStaffBoundingSpacers();
+
+            const upperXml = upperMidis.length
+                ? upperMidis.map((m, i) => makeQuarterNoteXml(midiToPitchInfo(m), 1, i > 0)).join("") + spacers.upper
+                : makeQuarterRestXml(1);
+
+            const lowerXml = lowerMidis.length
+                ? lowerMidis.map((m, i) => makeQuarterNoteXml(midiToPitchInfo(m), 2, i > 0)).join("") + spacers.lower
+                : makeQuarterRestXml(2) + spacers.lower;
+
+            return `<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE score-partwise PUBLIC
+  "-//Recordare//DTD MusicXML 3.1 Partwise//EN"
+  "http://www.musicxml.org/dtds/partwise.dtd">
+<score-partwise version="3.1">
+  <part-list>
+    <score-part id="P1"><part-name>Piano</part-name></score-part>
+  </part-list>
+  <part id="P1">
+    <measure number="1">
+      <attributes>
+        <divisions>1</divisions>
+        <key><fifths>${fifths}</fifths></key>
+        <time><beats>1</beats><beat-type>4</beat-type></time>
+        <staves>2</staves>
+        <clef number="1"><sign>G</sign><line>2</line></clef>
+        <clef number="2"><sign>F</sign><line>4</line></clef>
+      </attributes>
+      ${upperXml}
+      <backup><duration>1</duration></backup>
+      ${lowerXml}
+    </measure>
+  </part>
+</score-partwise>`;
+        }
+
+        function createMusicXMLForSequence(midis) {
+            const staffMode = document.getElementById("staffMode").value;
+            const fifths = parseInt(document.getElementById("keySignature").value, 10);
+            if (!midis || midis.length === 0) return null;
+
+            if (staffMode === "treble") {
+                return createSingleStaffXmlForSequence(midis.map(midiToPitchInfo), "G", 2, fifths);
+            }
+            if (staffMode === "bass") {
+                return createSingleStaffXmlForSequence(midis.map(midiToPitchInfo), "F", 4, fifths);
+            }
+            return createGrandStaffXmlForSequence(midis, fifths);
+        }
+
+        function createMusicXMLForChord(midis) {
+            const staffMode = document.getElementById("staffMode").value;
+            const fifths = parseInt(document.getElementById("keySignature").value, 10);
+            if (!midis || midis.length === 0) return null;
+
+            if (staffMode === "treble") {
+                return createSingleStaffXmlForChord(midis, "G", 2, fifths);
+            }
+            if (staffMode === "bass") {
+                return createSingleStaffXmlForChord(midis, "F", 4, fifths);
+            }
+            return createGrandStaffXmlForChord(midis, fifths);
+        }
+
+        async function renderXmlInto(containerId, xml, previewHeight = null) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = "";
+            if (!xml) return;
+
+            const viewer = new opensheetmusicdisplay.OpenSheetMusicDisplay(container, {
+                autoResize: true,
+                backend: "svg",
+                drawTitle: false,
+                drawingParameters: "compacttight",
+                renderSingleHorizontalStaffline: false
+            });
+
+            try {
+                await viewer.load(xml);
+                viewer.render();
+            } catch (error) {
+                container.innerHTML = "";
+                throw error;
+            }
+
+            if (previewHeight !== null) {
+                const svg = container.querySelector("svg");
+                if (svg) {
+                    addSvgViewBoxPadding(svg, 8);
+                    svg.style.width = "220px";
+                    svg.style.height = "auto";
+                    svg.style.maxHeight = `${previewHeight}px`;
+                    svg.style.display = "block";
+                }
+            }
+        }
+
+        async function renderRangePreview() {
+            const myToken = ++previewRenderToken;
+            const min = parseInt(document.getElementById("minNote").value, 10);
+            const max = parseInt(document.getElementById("maxNote").value, 10);
+            if (Number.isNaN(min) || Number.isNaN(max)) return;
+
+            const minPitch = midiToPitchInfo(min);
+            const maxPitch = midiToPitchInfo(max);
+            const keyText = document.getElementById("keySignature").selectedOptions[0].textContent;
+
+            document.getElementById("rangePreviewLabel").textContent =
+                `範囲プレビュー
+最高音: ${pitchToText(maxPitch)} / MIDI ${max}
+最低音: ${pitchToText(minPitch)} / MIDI ${min}
+調号: ${keyText}`;
+
+            const xml = createMusicXMLForChord([min, max]);
+            await renderXmlInto("rangePreviewScore", xml, 120);
+            if (myToken !== previewRenderToken) return;
+        }
+
+        async function renderMainQuestion(midi) {
+            const myToken = ++renderToken;
+            const scoreDiv = document.getElementById("score");
+            scoreDiv.innerHTML = "";
+
+            if (midi === null) {
+                document.getElementById("debug").textContent = "出題できる音がありません。設定を見直してください。";
+                return;
+            }
+
+            const xml = createMusicXMLForSequence([midi]);
+            osmd = new opensheetmusicdisplay.OpenSheetMusicDisplay(scoreDiv, {
+                autoResize: false,
+                backend: "svg",
+                drawTitle: false,
+                drawingParameters: "compacttight"
+            });
+
+            try {
+                await osmd.load(xml);
+                if (myToken !== renderToken) return;
+                osmd.render();
+            } catch (error) {
+                if (myToken !== renderToken) return;
+                scoreDiv.innerHTML = "";
+                throw error;
+            }
+
+            addSvgViewBoxPadding(scoreDiv.querySelector("svg"), 8);
+            applyQuestionScale();
+
+            const pitch = midiToPitchInfo(midi);
+            const staffMode = document.getElementById("staffMode").value;
+            const keyText = document.getElementById("keySignature").selectedOptions[0].textContent;
+            const scaleMode = document.getElementById("allowChromatic").checked
+                ? "スケール外を含む"
+                : "スケール内のみ";
+            let staffText = staffMode;
+
+            if (staffMode === "grand") {
+                const candidates = getGrandStaffCandidates(midi, pitch);
+                const labels = candidates.map(staff => staff === "treble" ? "ト音" : "ヘ音");
+                staffText = labels.length > 1 ? `${labels.join(" / ")} のいずれか` : labels[0];
+            }
+
+            document.getElementById("debug").textContent =
+                `現在の出題: ${pitchToText(pitch)} / MIDI ${midi}
+譜表: ${staffText}
+調号: ${keyText}
+出題範囲: ${scaleMode}`;
+        }
+
+        async function nextQuestion() {
+            const min = parseInt(document.getElementById("minNote").value, 10);
+            const max = parseInt(document.getElementById("maxNote").value, 10);
+
+            try {
+                await renderRangePreview();
+            } catch (error) {
+                console.error(error);
+                document.getElementById("status").textContent = "範囲プレビューの描画に失敗しました";
+                document.getElementById("debug").textContent = String(error);
+                return;
+            }
+
+            if (min > max) {
+                currentNote = null;
+                document.getElementById("status").textContent = "最低音が最高音を超えています";
+                await renderMainQuestion(null);
+                return;
+            }
+
+            currentNote = randomNoteNoRepeat();
+            try {
+                await renderMainQuestion(currentNote);
+            } catch (error) {
+                console.error(error);
+                currentNote = null;
+                document.getElementById("status").textContent = "譜面の描画に失敗しました";
+                document.getElementById("debug").textContent = String(error);
+                return;
+            }
+
+            if (currentNote !== null) {
+                document.getElementById("status").textContent = "入力待ち";
+            } else {
+                document.getElementById("status").textContent = "出題できる音がありません";
+            }
+        }
+
+        function handleMidiMessage(event) {
+            const [status, note, velocity] = event.data;
+            const command = status & 0xf0;
+
+            if (command === 0x90 && velocity > 0) {
+                if (currentNote === null) return;
+
+                if (note === currentNote) {
+                    document.getElementById("status").textContent = "正解！";
+                    previousNote = currentNote;
+                    setTimeout(() => {
+                        nextQuestion().catch(error => {
+                            console.error(error);
+                            document.getElementById("status").textContent = "次の問題の生成に失敗しました";
+                            document.getElementById("debug").textContent = String(error);
+                        });
+                    }, 250);
+                } else {
+                    document.getElementById("status").textContent = `違う音です: ${midiToDisplayName(note)}`;
+                }
+            }
+        }
+
+        function bindMidiInputs() {
+            if (!midiAccess) return;
+
+            let count = 0;
+            for (const input of midiAccess.inputs.values()) {
+                input.onmidimessage = handleMidiMessage;
+                count++;
+            }
+
+            if (count > 0) {
+                document.getElementById("midiStatus").textContent = `MIDI接続OK (${count}台)`;
+            } else {
+                document.getElementById("midiStatus").textContent = "MIDI機器が見つかりません";
+            }
+        }
+
+        function onMIDISuccess(access) {
+            midiAccess = access;
+            bindMidiInputs();
+            midiAccess.onstatechange = () => bindMidiInputs();
+        }
+
+        function onMIDIFailure(error) {
+            console.error(error);
+            document.getElementById("midiStatus").textContent = "MIDI接続失敗";
+        }
+
+        function refreshQuestion() {
+            previousNote = null;
+            saveSettings();
+            nextQuestion().catch(error => {
+                console.error(error);
+                document.getElementById("status").textContent = "問題の更新に失敗しました";
+                document.getElementById("debug").textContent = String(error);
+            });
+        }
+
+        function syncGrandStaffLedgerControls() {
+            const staffMode = document.getElementById("staffMode").value;
+            const enabled = staffMode === "grand";
+            const ledgerToggle = document.getElementById("allowGrandStaffLedger");
+            const ledgerLimit = document.getElementById("grandStaffLedgerLimit");
+            ledgerToggle.disabled = !enabled;
+            ledgerLimit.disabled = !enabled || !ledgerToggle.checked;
+        }
+
+        function initEvents() {
+            document.getElementById("maxNote").addEventListener("change", refreshQuestion);
+            document.getElementById("minNote").addEventListener("change", refreshQuestion);
+            document.getElementById("keySignature").addEventListener("change", refreshQuestion);
+            document.getElementById("staffMode").addEventListener("change", () => {
+                syncGrandStaffLedgerControls();
+                refreshQuestion();
+            });
+            document.getElementById("allowChromatic").addEventListener("change", refreshQuestion);
+            document.getElementById("avoidNearby").addEventListener("change", refreshQuestion);
+            document.getElementById("allowGrandStaffLedger").addEventListener("change", () => {
+                syncGrandStaffLedgerControls();
+                refreshQuestion();
+            });
+            document.getElementById("grandStaffLedgerLimit").addEventListener("change", refreshQuestion);
+            document.getElementById("accidentalMode").addEventListener("change", refreshQuestion);
+            document.querySelectorAll(".scale-button").forEach((button) => {
+                button.addEventListener("click", () => {
+                    questionScale = Number(button.dataset.scale);
+                    applyQuestionScale();
+                    saveSettings();
+                });
+            });
+        }
+
+        async function init() {
+            createNoteOptions();
+            createKeyOptions();
+            applySavedSettings();
+            syncGrandStaffLedgerControls();
+            applyQuestionScale();
+            initEvents();
+
+            if (navigator.requestMIDIAccess) {
+                navigator.requestMIDIAccess().then(onMIDISuccess, onMIDIFailure);
+            } else {
+                document.getElementById("midiStatus").textContent = "このブラウザはWeb MIDIに対応していません";
+            }
+
+            await nextQuestion();
+        }
+
+        init().catch(err => {
+            console.error(err);
+            document.getElementById("status").textContent = "初期化に失敗しました";
+            document.getElementById("debug").textContent = String(err);
+        });
+    </script>
+</body>
+
+</html>
