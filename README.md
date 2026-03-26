@@ -3,6 +3,8 @@
 ブラウザ上で動作する、MIDI キーボード対応の譜読み練習アプリです。  
 出題範囲、調号、譜表、加線ルール、臨時記号表記などを設定し、表示された音符に対応する鍵盤を弾いて練習できます。
 
+[https://ryjkmr.github.io/note-read-plactice/](https://ryjkmr.github.io/note-read-plactice/)
+
 ## 特徴
 
 - MIDI キーボード入力で解答
